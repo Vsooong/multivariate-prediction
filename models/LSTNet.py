@@ -44,13 +44,14 @@ class Model(nn.Module):
         # RNN 
         r = c.permute(2, 0, 1).contiguous()
         _, r = self.GRU1(r)
+
         r = self.dropout(torch.squeeze(r, 0))
 
         # skip-rnn
 
         if (self.skip > 0):
+            self.pt=int(self.pt)
             s = c[:, :, int(-self.pt * self.skip):].contiguous()
-            print(self.pt, batch_size * self.skip, self.hidC)
 
             s = s.view(batch_size, self.hidC, self.pt, self.skip)
             s = s.permute(2, 0, 3, 1).contiguous()
@@ -62,8 +63,10 @@ class Model(nn.Module):
 
         res = self.linear1(r)
 
+
         # highway
         if (self.hw > 0):
+
             z = x[:, -self.hw:, :]
             z = z.permute(0, 2, 1).contiguous().view(-1, self.hw)
             z = self.highway(z)
