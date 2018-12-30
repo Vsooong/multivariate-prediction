@@ -6,7 +6,6 @@ import torch.nn.functional as F
 class Model(nn.Module):
     def __init__(self, args, data):
         super(Model, self).__init__()
-        self.use_cuda = args.cuda
         self.P = args.window
         self.m = data.m
         self.hidR = args.hidRNN
