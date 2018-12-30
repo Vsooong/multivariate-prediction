@@ -9,61 +9,7 @@ import numpy as np
 import importlib
 
 from utils import *
-import Optim
-
-
-def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size):
-    model.eval()
-    total_loss = 0
-    total_loss_l1 = 0
-    n_samples = 0
-    predict = None
-    test = None
-
-    for X, Y in data.get_batches(X, Y, batch_size, False):
-        output = model(X)
-        if predict is None:
-            predict = output
-            test = Y
-        else:
-            predict = torch.cat((predict, output))
-            test = torch.cat((test, Y))
-
-        scale = data.scale.expand(output.size(0), data.m)
-        total_loss += evaluateL2(output * scale, Y * scale).data.item()
-        total_loss_l1 += evaluateL1(output * scale, Y * scale).data.item()
-        n_samples += (output.size(0) * data.m)
-    rse = math.sqrt(total_loss / n_samples) / data.rse
-    rae = (total_loss_l1 / n_samples) / data.rae
-
-    predict = predict.data.cpu().numpy()
-    Ytest = test.data.cpu().numpy()
-    sigma_p = (predict).std(axis=0)
-    sigma_g = (Ytest).std(axis=0)
-    mean_p = predict.mean(axis=0)
-    mean_g = Ytest.mean(axis=0)
-    index = (sigma_g != 0)
-    correlation = ((predict - mean_p) * (Ytest - mean_g)).mean(axis=0) / (sigma_p * sigma_g)
-    correlation = (correlation[index]).mean()
-    return rse, rae, correlation
-
-
-def train(data, X, Y, model, criterion, optim, batch_size):
-    model.train()
-    total_loss = 0
-    n_samples = 0
-    for X, Y in data.get_batches(X, Y, batch_size, True):
-        optim.zero_grad()
-        output = model(X)
-        scale = data.scale.expand(output.size(0), data.m)
-        loss = criterion(output * scale, Y * scale)
-        loss.backward()
-
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        optim.step()
-        total_loss += loss.data.item()
-        n_samples += (output.size(0) * data.m)
-    return total_loss / n_samples
+from train_eval import train,evaluate,makeOptimizer
 
 
 parser = argparse.ArgumentParser(description='PyTorch Time series forecasting')
@@ -142,7 +88,7 @@ best_val = 10000000
 #     model.parameters(), args.optim, args.lr, args.clip,
 # )
 
-optim=Optim.makeOptimizer(model.parameters(),args)
+optim=makeOptimizer(model.parameters(),args)
 
 
 # At any point you can hit Ctrl + C to break out of training early.
@@ -150,9 +96,8 @@ try:
     print('begin training')
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
-        train_loss = train(Data, Data.train[0], Data.train[1], model, criterion, optim, args.batch_size)
-        val_loss, val_rae, val_corr = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1,
-                                               args.batch_size)
+        train_loss = train(Data, Data.train[0], Data.train[1], model, criterion, optim, args)
+        val_loss, val_rae, val_corr = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1, args)
         print(
             '| end of epoch {:3d} | time: {:5.2f}s | train_loss {:5.4f} | valid rse {:5.4f} | valid rae {:5.4f} | valid corr  {:5.4f}'.format(
                 epoch, (time.time() - epoch_start_time), train_loss, val_loss, val_rae, val_corr))
