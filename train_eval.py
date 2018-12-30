@@ -1,6 +1,9 @@
 import math
 import torch.optim as optim
 import torch
+import numpy as np
+np.seterr(divide='ignore', invalid='ignore')
+
 def evaluate(data, X, Y, model, evaluateL2, evaluateL1, args):
     model.eval()
     total_loss = 0
@@ -54,15 +57,16 @@ def train(data, X, Y, model, criterion, optim, args):
         n_samples += (output.size(0) * data.m)
     return total_loss / n_samples
 
+
 def makeOptimizer(params, args):
     if args.optim == 'sgd':
-        optimizer = optim.SGD(params, lr=args.lr,)
+        optimizer = optim.SGD(params, lr=args.lr, )
     elif args.optim == 'adagrad':
-        optimizer = optim.Adagrad(params, lr=args.lr,)
+        optimizer = optim.Adagrad(params, lr=args.lr, )
     elif args.optim == 'adadelta':
-        optimizer = optim.Adadelta(params, lr=args.lr,)
+        optimizer = optim.Adadelta(params, lr=args.lr, )
     elif args.optim == 'adam':
-        optimizer = optim.Adam(params, lr=args.lr,)
+        optimizer = optim.Adam(params, lr=args.lr, )
     else:
         raise RuntimeError("Invalid optim method: " + args.method)
     return optimizer

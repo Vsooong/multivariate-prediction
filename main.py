@@ -5,12 +5,10 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 from models import LSTNet
-import numpy as np
 import importlib
 
 from utils import *
-from train_eval import train,evaluate,makeOptimizer
-
+from train_eval import train, evaluate, makeOptimizer
 
 parser = argparse.ArgumentParser(description='PyTorch Time series forecasting')
 parser.add_argument('--data', type=str, required=True,
@@ -88,8 +86,7 @@ best_val = 10000000
 #     model.parameters(), args.optim, args.lr, args.clip,
 # )
 
-optim=makeOptimizer(model.parameters(),args)
-
+optim = makeOptimizer(model.parameters(), args)
 
 # At any point you can hit Ctrl + C to break out of training early.
 try:
