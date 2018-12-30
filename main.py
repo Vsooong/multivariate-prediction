@@ -27,7 +27,7 @@ parser.add_argument('--highway_window', type=int, default=24,
                     help='The window size of the highway component')
 parser.add_argument('--clip', type=float, default=10.,
                     help='gradient clipping')
-parser.add_argument('--epochs', type=int, default=100,
+parser.add_argument('--epochs', type=int, default=30,
                     help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='batch size')
@@ -59,7 +59,7 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-Data = Data_utility(args.data, 0.6, 0.2, args.cuda, args.horizon, args.window, args.normalize)
+Data = Data_utility(args.data, 0.6, 0.2, device, args)
 
 model = eval(args.model).Model(args, Data)
 
@@ -82,9 +82,6 @@ if args.cuda:
 
 best_val = 10000000
 
-# optim = Optim.Optim(
-#     model.parameters(), args.optim, args.lr, args.clip,
-# )
 
 optim = makeOptimizer(model.parameters(), args)
 
@@ -94,19 +91,17 @@ try:
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
         train_loss = train(Data, Data.train[0], Data.train[1], model, criterion, optim, args)
+
         val_loss, val_rae, val_corr = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1, args)
-        print(
-            '| end of epoch {:3d} | time: {:5.2f}s | train_loss {:5.4f} | valid rse {:5.4f} | valid rae {:5.4f} | valid corr  {:5.4f}'.format(
-                epoch, (time.time() - epoch_start_time), train_loss, val_loss, val_rae, val_corr))
-        # Save the model if the validation loss is the best we've seen so far.
+        print('| end of epoch {:3d} | time: {:5.2f}s | train_loss {:5.4f} | valid rse {:5.4f} | valid rae {:5.4f} | valid corr  {:5.4f}'.
+                format( epoch, (time.time() - epoch_start_time), train_loss, val_loss, val_rae, val_corr))
 
         if val_loss < best_val:
             with open(args.save, 'wb') as f:
                 torch.save(model, f)
             best_val = val_loss
         if epoch % 5 == 0:
-            test_acc, test_rae, test_corr = evaluate(Data, Data.test[0], Data.test[1], model, evaluateL2, evaluateL1,
-                                                     args.batch_size)
+            test_acc, test_rae, test_corr = evaluate(Data, Data.test[0], Data.test[1], model, evaluateL2, evaluateL1,args)
             print("test rse {:5.4f} | test rae {:5.4f} | test corr {:5.4f}".format(test_acc, test_rae, test_corr))
 
 except KeyboardInterrupt:
@@ -116,6 +111,5 @@ except KeyboardInterrupt:
 # Load the best saved model.
 with open(args.save, 'rb') as f:
     model = torch.load(f)
-test_acc, test_rae, test_corr = evaluate(Data, Data.test[0], Data.test[1], model, evaluateL2, evaluateL1,
-                                         args.batch_size)
+test_acc, test_rae, test_corr = evaluate(Data, Data.test[0], Data.test[1], model, evaluateL2, evaluateL1,args)
 print("test rse {:5.4f} | test rae {:5.4f} | test corr {:5.4f}".format(test_acc, test_rae, test_corr))
