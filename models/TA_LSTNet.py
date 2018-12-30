@@ -1,48 +1,44 @@
 #author Guan Song Wang
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class Model(nn.Module):
     def __init__(self, args, data):
         super(Model, self).__init__()
-        self.P = args.window
-        self.m = data.m
+        self.window = args.window
+        self.variables = data.m
         self.hidR = args.hidRNN
         self.hidC = args.hidCNN
-        self.hidS = args.hidSkip
-        self.Ck = args.CNN_kernel
-        self.skip = args.skip
-        self.pt = (self.P - self.Ck) / self.skip
-        self.hw = args.highway_window
-        self.conv1 = nn.Conv2d(1, self.hidC, kernel_size=(self.Ck, self.m))
-        self.GRU1 = nn.GRU(self.hidC, self.hidR)
+
+        self.GRU1=nn.GRU(self.variables,self.hidR,num_layers=args.rnn_layer)
+        self.Conv1 = nn.Conv2d(1, self.hidC, kernel_size=(self.window, 1))
         self.dropout = nn.Dropout(p=args.dropout)
-        if (self.skip > 0):
-            self.GRUskip = nn.GRU(self.hidC, self.hidS)
-            self.linear1 = nn.Linear(self.hidR + self.skip * self.hidS, self.m)
-        else:
-            self.linear1 = nn.Linear(self.hidR, self.m)
-        if (self.hw > 0):
-            self.highway = nn.Linear(self.hw, 1)
-        self.output = None
-        if (args.output_fun == 'sigmoid'):
-            self.output = F.sigmoid
-        if (args.output_fun == 'tanh'):
-            self.output = F.tanh
+        
+
 
     def forward(self, x):
+
         batch_size = x.size(0)
 
+        r=x.permute(1,0,2).contiguous()
+        out,_=self.GRU1(r)
+
+        c=out.permute(1,0,2).contiguous()
+        c=c.view(-1,1,self.window, c.size(2))
+        c=self.Conv1(c).squeeze(2)
+        print(c.size())
+
+        return
+        
+
         # CNN
-        c = x.view(-1, 1, self.P, self.m)
+        c = x.view(-1, 1, self.window, self.variables)
         c = F.relu(self.conv1(c))
         c = self.dropout(c)
         c = torch.squeeze(c, 3)
 
-        # RNN 
+        # RNN
         r = c.permute(2, 0, 1).contiguous()
         _, r = self.GRU1(r)
 
@@ -71,7 +67,7 @@ class Model(nn.Module):
             z = x[:, -self.hw:, :]
             z = z.permute(0, 2, 1).contiguous().view(-1, self.hw)
             z = self.highway(z)
-            z = z.view(-1, self.m)
+            z = z.view(-1, self.variables)
             res = res + z
 
         if (self.output):
