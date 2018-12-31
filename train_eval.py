@@ -15,16 +15,18 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, args):
     for X, Y in data.get_batches(X, Y, args.batch_size, False):
         output = model(X)
         if predict is None:
-            predict = output
+            predict = output.clone().detach()
             test = Y
         else:
-            predict = torch.cat((predict, output))
+            predict = torch.cat((predict, output.clone().detach()))
             test = torch.cat((test, Y))
 
         scale = data.scale.expand(output.size(0), data.m)
-        total_loss += evaluateL2(output * scale, Y * scale).data.item()
-        total_loss_l1 += evaluateL1(output * scale, Y * scale).data.item()
-        n_samples += (output.size(0) * data.m)
+        total_loss += float(evaluateL2(output * scale, Y * scale).data.item())
+        total_loss_l1 +=float( evaluateL1(output * scale, Y * scale).data.item())
+
+        n_samples += int((output.size(0) * data.m))
+
     rse = math.sqrt(total_loss / n_samples) / data.rse
     rae = (total_loss_l1 / n_samples) / data.rae
 
@@ -54,8 +56,16 @@ def train(data, X, Y, model, criterion, optim, args):
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optim.step()
         total_loss += loss.data.item()
-        n_samples += (output.size(0) * data.m)
+        n_samples +=int( (output.size(0) * data.m))
     return total_loss / n_samples
+def train_keras(data,X,Y,model,args):
+    total_loss = 0
+    n_samples = 0
+    for X, Y in data.get_batches(X, Y, args.batch_size, True):
+        output=model(X)
+        print(output)
+def evaluate_keras():
+    pass
 
 
 def makeOptimizer(params, args):

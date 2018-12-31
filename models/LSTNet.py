@@ -1,4 +1,4 @@
-#author Guan Song Wang
+__author__ = "Guan Song Wang"
 
 import torch
 import torch.nn as nn
@@ -48,6 +48,8 @@ class Model(nn.Module):
 
         r = self.dropout(torch.squeeze(r, 0))
 
+
+
         # skip-rnn
 
         if (self.skip > 0):
@@ -63,7 +65,6 @@ class Model(nn.Module):
             r = torch.cat((r, s), 1)
 
         res = self.linear1(r)
-
 
         # highway
         if (self.hw > 0):

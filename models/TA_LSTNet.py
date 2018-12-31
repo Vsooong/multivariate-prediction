@@ -1,74 +1,61 @@
-#author Guan Song Wang
+__author__ = "Guan Song Wang"
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from models.MultiHeadAttention import MultiHeadAttention
 
 class Model(nn.Module):
     def __init__(self, args, data):
         super(Model, self).__init__()
         self.window = args.window
         self.variables = data.m
-        self.hidR = args.hidRNN
         self.hidC = args.hidCNN
+        self.hidR = args.hidRNN
 
+        self.d_v=args.d_v
+        self.d_k=args.d_k
+        self.Ck = args.CNN_kernel
         self.GRU1=nn.GRU(self.variables,self.hidR,num_layers=args.rnn_layer)
-        self.Conv1 = nn.Conv2d(1, self.hidC, kernel_size=(self.window, 1))
+        self.Conv1 = nn.Conv2d(1, self.hidC, kernel_size=(self.Ck, self.variables))
+
+        self.slf_attn = MultiHeadAttention(args.n_head, self.hidR, self.d_k,self.d_v , dropout=args.dropout)
+
+        # self.pooling=nn.MaxPool2d(kernel_size=(self.window,1))
         self.dropout = nn.Dropout(p=args.dropout)
-        
+        self.linear_out=nn.Linear(self.window*self.hidR,self.variables)
+
+        self.output = None
+        if (args.output_fun == 'sigmoid'):
+            self.output = F.sigmoid
+        if (args.output_fun == 'tanh'):
+            self.output = F.tanh
 
 
     def forward(self, x):
+        batch_s=x.size(0)
+        r = x.permute(1, 0, 2).contiguous()
+        out, _ = self.GRU1(r)
+        c = out.permute(1, 0, 2).contiguous()
 
-        batch_size = x.size(0)
+        # c = x.view(-1,1, self.window, self.variables)
+        #
+        # c = F.relu(self.Conv1(c))
+        # c = self.dropout(c)
+        # c = torch.squeeze(c, 3)
+        # c=c.permute(0,2,1).contiguous()
 
-        r=x.permute(1,0,2).contiguous()
-        out,_=self.GRU1(r)
+        attn_output, slf_attn=self.slf_attn(c,c,c,mask=None)
 
-        c=out.permute(1,0,2).contiguous()
-        c=c.view(-1,1,self.window, c.size(2))
-        c=self.Conv1(c).squeeze(2)
-        print(c.size())
+        # attn_output=attn_output.view(-1,1,self.window,self.d_k)
+        #
+        # pool=self.pooling(attn_output).squeeze()
+        # pool=self.dropout(pool)
 
-        return
-        
+        # print(attn_output.size())
 
-        # CNN
-        c = x.view(-1, 1, self.window, self.variables)
-        c = F.relu(self.conv1(c))
-        c = self.dropout(c)
-        c = torch.squeeze(c, 3)
-
-        # RNN
-        r = c.permute(2, 0, 1).contiguous()
-        _, r = self.GRU1(r)
-
-        r = self.dropout(torch.squeeze(r, 0))
-
-        # skip-rnn
-
-        if (self.skip > 0):
-            self.pt=int(self.pt)
-            s = c[:, :, int(-self.pt * self.skip):].contiguous()
-
-            s = s.view(batch_size, self.hidC, self.pt, self.skip)
-            s = s.permute(2, 0, 3, 1).contiguous()
-            s = s.view(self.pt, batch_size * self.skip, self.hidC)
-            _, s = self.GRUskip(s)
-            s = s.view(batch_size, self.skip * self.hidS)
-            s = self.dropout(s)
-            r = torch.cat((r, s), 1)
-
-        res = self.linear1(r)
-
-
-        # highway
-        if (self.hw > 0):
-
-            z = x[:, -self.hw:, :]
-            z = z.permute(0, 2, 1).contiguous().view(-1, self.hw)
-            z = self.highway(z)
-            z = z.view(-1, self.variables)
-            res = res + z
+        attn_output=attn_output.view(batch_s,-1)
+        res=self.linear_out(attn_output)
 
         if (self.output):
             res = self.output(res)

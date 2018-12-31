@@ -1,14 +1,16 @@
+__author__ = "Guan Song Wang"
+
 import argparse
 import math
 import time
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
-from models import LSTNet,TA_LSTNet
+from models import LSTNet,TA_LSTNet,CNN,RNN
 import importlib
 
 from utils import *
-from train_eval import train, evaluate, makeOptimizer
+from train_eval import train, evaluate, makeOptimizer,train_keras,evaluate_keras
 
 parser = argparse.ArgumentParser(description='PyTorch Time series forecasting')
 parser.add_argument('--data', type=str, required=True,help='location of the data file')
@@ -22,6 +24,11 @@ parser.add_argument('--rnn_layer', type=int, default=1, help='number of RNN hidd
 parser.add_argument('--hidCNN', type=int, default=100, help='number of CNN hidden units (channels)')
 parser.add_argument('--CNN_kernel', type=int, default=6, help='the kernel size of the CNN layers')
 parser.add_argument('--highway_window', type=int, default=24, help='The window size of the highway component')
+
+parser.add_argument('-n_head', type=int, default=8)
+parser.add_argument('-d_k', type=int, default=64)
+parser.add_argument('-d_v', type=int, default=64)
+
 parser.add_argument('--clip', type=float, default=10.,help='gradient clipping')
 parser.add_argument('--epochs', type=int, default=30, help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=128, metavar='N', help='batch size')
@@ -56,8 +63,14 @@ Data = Data_utility(args.data, 0.6, 0.2, device, args)
 # Select model
 model = eval(args.model).Model(args, Data)
 
-if args.cuda:
-    model = nn.DataParallel(model)
+if args.model =='RNN' or args.model =='CNN':
+    train_method = train_keras
+    eval_method = evaluate_keras
+else:
+    train_method = train
+    eval_method = evaluate
+    if args.cuda:
+        model = nn.DataParallel(model)
 
 nParams = sum([p.nelement() for p in model.parameters()])
 print('number of parameters: %d' % nParams)
@@ -84,9 +97,9 @@ try:
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
 
-        train_loss = train(Data, Data.train[0], Data.train[1], model, criterion, optim, args)
+        train_loss = train_method(Data, Data.train[0], Data.train[1], model, criterion, optim, args)
 
-        val_loss, val_rae, val_corr = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1, args)
+        val_loss, val_rae, val_corr = eval_method(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1, args)
         print('| end of epoch {:3d} | time used: {:5.2f}s | train_loss {:5.4f} | valid rse {:5.4f} | valid rae {:5.4f} | valid corr  {:5.4f}'.
                 format( epoch, (time.time() - epoch_start_time), train_loss, val_loss, val_rae, val_corr))
 
@@ -95,7 +108,7 @@ try:
                 torch.save(model, f)
             best_val = val_loss
         if epoch % 10 == 0:
-            test_acc, test_rae, test_corr = evaluate(Data, Data.test[0], Data.test[1], model, evaluateL2, evaluateL1,args)
+            test_acc, test_rae, test_corr = eval_method(Data, Data.test[0], Data.test[1], model, evaluateL2, evaluateL1,args)
             print("| test rse {:5.4f} | test rae {:5.4f} | test corr {:5.4f}\n".format(test_acc, test_rae, test_corr))
 
 except KeyboardInterrupt:
