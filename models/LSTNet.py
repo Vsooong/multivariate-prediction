@@ -15,12 +15,13 @@ class Model(nn.Module):
         self.hidS = args.hidSkip
         self.Ck = args.CNN_kernel
         self.skip = args.skip
-        self.pt = (self.P - self.Ck) / self.skip
+
         self.hw = args.highway_window
         self.conv1 = nn.Conv2d(1, self.hidC, kernel_size=(self.Ck, self.m))
         self.GRU1 = nn.GRU(self.hidC, self.hidR)
         self.dropout = nn.Dropout(p=args.dropout)
         if (self.skip > 0):
+            self.pt = (self.P - self.Ck) / self.skip
             self.GRUskip = nn.GRU(self.hidC, self.hidS)
             self.linear1 = nn.Linear(self.hidR + self.skip * self.hidS, self.m)
         else:
