@@ -29,17 +29,17 @@ class Model(nn.Module):
     def forward(self, x):
         r= x.permute(1,0,2).contiguous()
         _,r=self.rnn1(r)
-        r=self.dropout(torch.squeeze(r, 0))
+        r=self.dropout(torch.squeeze(r[-1:,:,:], 0))
         out = self.linear1(r)
 
 
-        # if (self.hw > 0):
-        #
-        #     z = x[:, -self.hw:, :]
-        #     z = z.permute(0, 2, 1).contiguous().view(-1, self.hw)
-        #     z = self.highway(z)
-        #     z = z.view(-1, self.variables)
-        #     out = out + z
+        if (self.hw > 0):
+
+            z = x[:, -self.hw:, :]
+            z = z.permute(0, 2, 1).contiguous().view(-1, self.hw)
+            z = self.highway(z)
+            z = z.view(-1, self.variables)
+            out = out + z
         if self.output is not None:
             out=self.output(out)
         return out
