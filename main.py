@@ -10,7 +10,7 @@ from models import LSTNet,TA_LSTNet,CNN,RNN
 import importlib
 
 from utils import *
-from train_eval import train, evaluate, makeOptimizer,train_keras,evaluate_keras
+from train_eval import train, evaluate, makeOptimizer
 
 parser = argparse.ArgumentParser(description='PyTorch Time series forecasting')
 parser.add_argument('--data', type=str, required=True,help='location of the data file')
@@ -19,7 +19,7 @@ parser.add_argument('--window', type=int, default=24 * 7,help='window size')
 parser.add_argument('--horizon', type=int, default=12)
 
 parser.add_argument('--hidRNN', type=int, default=100, help='number of RNN hidden units each layer')
-parser.add_argument('--rnn_layer', type=int, default=1, help='number of RNN hidden layers')
+parser.add_argument('--rnn_layers', type=int, default=1, help='number of RNN hidden layers')
 
 parser.add_argument('--hidCNN', type=int, default=100, help='number of CNN hidden units (channels)')
 parser.add_argument('--CNN_kernel', type=int, default=6, help='the kernel size of the CNN layers')
@@ -30,7 +30,7 @@ parser.add_argument('-d_k', type=int, default=64)
 parser.add_argument('-d_v', type=int, default=64)
 
 parser.add_argument('--clip', type=float, default=10.,help='gradient clipping')
-parser.add_argument('--epochs', type=int, default=30, help='upper epoch limit')
+parser.add_argument('--epochs', type=int, default=20, help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=128, metavar='N', help='batch size')
 parser.add_argument('--dropout', type=float, default=0.2, help='dropout applied to layers (0 = no dropout)')
 parser.add_argument('--seed', type=int, default=54321,help='random seed')
@@ -48,6 +48,8 @@ parser.add_argument('--normalize', type=int, default=2)
 parser.add_argument('--output_fun', type=str, default='sigmoid')
 args = parser.parse_args()
 
+
+
 # Choose device: cpu or gpu
 args.cuda = torch.cuda.is_available()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,23 +61,7 @@ if args.cuda:
 
 # Load data
 Data = Data_utility(args.data, 0.6, 0.2, device, args)
-
-# Select model
-model = eval(args.model).Model(args, Data)
-
-if args.model =='RNN' or args.model =='CNN':
-    train_method = train_keras
-    eval_method = evaluate_keras
-else:
-    train_method = train
-    eval_method = evaluate
-    if args.cuda:
-        model = nn.DataParallel(model)
-
-nParams = sum([p.nelement() for p in model.parameters()])
-print('number of parameters: %d' % nParams)
-
-# Loss function
+# loss function
 if args.L1Loss:
     criterion = nn.L1Loss(size_average=False)
 else:
@@ -86,6 +72,16 @@ if args.cuda:
     criterion = criterion.cuda()
     evaluateL1 = evaluateL1.cuda()
     evaluateL2 = evaluateL2.cuda()
+
+# Select model
+model = eval(args.model).Model(args, Data)
+train_method = train
+eval_method = evaluate
+nParams = sum([p.nelement() for p in model.parameters()])
+print('number of parameters: %d' % nParams)
+if args.cuda:
+    model = nn.DataParallel(model)
+
 
 best_val = 10000000
 

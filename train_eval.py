@@ -58,15 +58,6 @@ def train(data, X, Y, model, criterion, optim, args):
         total_loss += loss.data.item()
         n_samples +=int( (output.size(0) * data.m))
     return total_loss / n_samples
-def train_keras(data,X,Y,model,args):
-    total_loss = 0
-    n_samples = 0
-    for X, Y in data.get_batches(X, Y, args.batch_size, True):
-        output=model(X)
-        print(output)
-def evaluate_keras():
-    pass
-
 
 def makeOptimizer(params, args):
     if args.optim == 'sgd':
